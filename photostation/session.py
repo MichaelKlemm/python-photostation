@@ -48,7 +48,12 @@ class SynologySession(object):
             print('{} response with code {} and body {}'.format(api, response.status_code, response.text))
             raise SynologyException('The API request cannot been made')
 
-        rsp = response.json()
+        try:
+            rsp = response.json()
+            print(rsp)
+        except:
+            print('not json')
+            return response.content
 
         if not rsp['success']:
             print('{} response with code {} and body {} to query {}'.format(api, response.status_code, pformat(rsp), pformat(request)))
@@ -117,7 +122,7 @@ class SynologyAuthSession(SynologySession):
         if not os.path.isdir(os.path.dirname(cookiefile)):
             return False
         print('save cookies to file ' + cookiefile)
-        with open(cookiefile, 'w') as f:
+        with open(cookiefile, 'wb') as f:
             f.truncate()
             pickle.dump(self.session.cookies._cookies, f)
 
@@ -127,7 +132,7 @@ class SynologyAuthSession(SynologySession):
             return False
 
         print('load cookies from file ' + cookiefile)
-        with open(cookiefile) as f:
+        with open(cookiefile, 'rb') as f:
             cookies = pickle.load(f)
             if cookies:
                 jar = requests.cookies.RequestsCookieJar()
