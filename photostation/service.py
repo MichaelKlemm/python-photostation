@@ -7,8 +7,8 @@ from photostation.utils import PhotoStationUtils
 from photostation.error import SynologyException
 from pprint import pprint, pformat
 
-class PhotoStationService(object):
 
+class PhotoStationService(object):
     session = None
 
     def __init__(self, url, root_album):
@@ -29,13 +29,14 @@ class PhotoStationService(object):
                 print('parent album {} is missing album {}'.format(parent.path, folder))
                 parent = parent.create(folder)
             else:
-                return None                
+                return None
 
         return parent
 
     @staticmethod
     def query(api, params):
         return PhotoStationService.session.query(api, params)
+
 
 class PhotoStationAlbum(object):
 
@@ -44,7 +45,7 @@ class PhotoStationAlbum(object):
         self.name = name
         self._items = None
         if self.parent:
-            self.path =  parent.path + '/' + name
+            self.path = parent.path + '/' + name
         else:
             self.path = name
 
@@ -63,7 +64,7 @@ class PhotoStationAlbum(object):
 
     def add_item(self, name, item):
         if self._items is not None:
-            self._items[name] = item 
+            self._items[name] = item
 
     def remove_item(self, name):
         if self._items is not None:
@@ -76,10 +77,11 @@ class PhotoStationAlbum(object):
                 'method': 'list',
                 'id': PhotoStationUtils.album_id(self.path),
                 'type': 'album,photo,video',
-                'offset': 0, 
+                'offset': 0,
                 'limit': -1,
-                'recursive': 'false'
-                })
+                'recursive': 'false',
+                'additional': 'album_permission,photo_exif,video_codec,video_quality,thumb_size,file_location'
+            })
 
             self._items = {}
             for item in items['items']:
@@ -101,7 +103,7 @@ class PhotoStationAlbum(object):
             'id': PhotoStationUtils.album_id(self.path),
             'method': 'create',
             'ps_username': PhotoStationService.session.username
-            })
+        })
         album = PhotoStationAlbum(self, name)
         self.add_item(name, album)
         return album
@@ -111,16 +113,26 @@ class PhotoStationAlbum(object):
             'id': PhotoStationUtils.album_id(self.path),
             'method': 'delete',
             'ps_username': PhotoStationService.session.username
-            })
+        })
         self.parent.remove_item(self.name)
 
-    def create_item(self, filename, filetype, created, modified = None, filesize = None, title = None, description = None, rating = None, latitude = None, longitude = None):
-        return PhotoStationPhoto(self, filename, filetype, created, modified, filesize, title, description, rating, latitude, longitude)
+    def create_item(self, filename, filetype, created, modified=None, filesize=None, title=None, description=None,
+                    rating=None, latitude=None, longitude=None):
+        return PhotoStationPhoto(self, filename, filetype, created, modified, filesize, title, description, rating,
+                                 latitude, longitude)
+
+class PhotoStationThumbnail(object):
+    def __init__(self, x, y, binary):
+        self.x = x
+        self.y = y
+        self.binary = binary
 
 class PhotoStationPhoto(object):
 
-    def __init__(self, album, filename, filetype, created, modified, filesize, title, description, rating, latitude, longitude):
+    def __init__(self, photoid, album, filename, filetype, created, modified, filesize, title, description, rating,
+                 latitude, longitude, thumbnail_sig, thumbnail_size):
         self.album = album
+        self.photoid = photoid
         self.filename = filename
         self.filetype = filetype
         self.created = created
@@ -131,6 +143,9 @@ class PhotoStationPhoto(object):
         self.rating = rating
         self.latitude = latitude
         self.longitude = longitude
+        self.thumbnail_sig = thumbnail_sig
+        self.thumbnail_size = thumbnail_size
+        self._thumbnails = None
 
     @classmethod
     def from_photostation(cls, album, psphoto):
@@ -146,33 +161,69 @@ class PhotoStationPhoto(object):
         else:
             latitude = longitude = None
 
-        return cls(album, 
-            filename = PhotoStationUtils.photo_name(psphoto['id']),
-            filetype = psphoto['type'],
-            created = created,
-            modified = modified,
-            filesize = filesize,
-            title = info['title'].encode('utf-8'),
-            description = info['description'].encode('utf-8'),
-            rating = info['rating'],
-            latitude = latitude,
-            longitude = longitude)
+        photoid = psphoto.get('id')
+        thumbnail_sig = ''
+        thumbnail_size = {}
+        try:
+            thumbnail_status = psphoto.get('thumbnail_status')
+            thumbnail_status = thumbnail_status.split(',')
+            thumb_size = psphoto.get('additional').get('thumb_size')
+            thumbnail_sig = thumb_size.get('sig')
+            for x in thumbnail_status:
+                thumbnail_size[x] = thumb_size.get(x)
+        except:
+            pass
+
+        return cls(album=album,
+                   photoid=photoid,
+                   filename=PhotoStationUtils.photo_name(psphoto['id']),
+                   filetype=psphoto['type'],
+                   created=created,
+                   modified=modified,
+                   filesize=filesize,
+                   title=info['title'].encode('utf-8'),
+                   description=info['description'].encode('utf-8'),
+                   rating=info['rating'],
+                   latitude=latitude,
+                   longitude=longitude,
+                   thumbnail_sig=thumbnail_sig,
+                   thumbnail_size=thumbnail_size)
 
     def __str__(self):
         return '{filename:' + self.filename.decode('utf-8').encode('unicode-escape') + \
-            ',filetype:' + self.filetype + \
-            ',created:' + str(self.created) + \
-            ',modified:' + str(self.modified) + \
-            ',filesize:' + str(self.filesize) + \
-            ',title:' + self.title.decode('utf-8').encode('unicode-escape') + \
-            ',description:' + self.description.decode('utf-8').encode('unicode-escape') + \
-            ',rating:' + str(self.rating) + \
-            ',latitude:' + str(self.latitude) + \
-            ',longitude:' + str(self.longitude) + '}'
+               ',filetype:' + self.filetype + \
+               ',created:' + str(self.created) + \
+               ',modified:' + str(self.modified) + \
+               ',filesize:' + str(self.filesize) + \
+               ',title:' + self.title.decode('utf-8').encode('unicode-escape') + \
+               ',description:' + self.description.decode('utf-8').encode('unicode-escape') + \
+               ',rating:' + str(self.rating) + \
+               ',latitude:' + str(self.latitude) + \
+               ',longitude:' + str(self.longitude) + '}'
 
     @property
     def fullpath(self):
-        return self.album.path + '/' + self.filename 
+        return self.album.path + '/' + self.filename
+
+    def thumbnails(self):
+        if not self._thumbnails and len(self.thumbnail_size) > 0:
+            thumbnails = {}
+            for size in self.thumbnail_size:
+                thumb = self.thumbnail_size.get(size)
+                x = thumb.get('resolutionx')
+                y = thumb.get('resolutiony')
+                mtime = thumb.get('mtime')
+                photo = PhotoStationService.session.query('SYNO.PhotoStation.Thumb', {
+                    'method': 'get',
+                    'version': 1,
+                    'size': size,
+                    'id': self.photoid,
+                    'thumb_sig': self.thumbnail_sig,
+                    'mtime': mtime}
+                )
+                thumbnails[size] = PhotoStationThumbnail(x, y, photo)
+            self._thumbnails = thumbnails
+        return self._thumbnails
 
     # Merge with remote if able.
     # Return false if rewrite is needed.
@@ -180,18 +231,19 @@ class PhotoStationPhoto(object):
 
         remote = self.album.item(self.filename)
         if remote is None \
-            or self.filename != remote.filename \
-            or self.filetype != remote.filetype:
-
+                or self.filename != remote.filename \
+                or self.filetype != remote.filetype:
             # print(self.filetype + ' ' + self.fullpath + ' not found or cannot be merged with ' + str(remote))
             return False
 
         if self.modified is not None and self.modified / 1000 > remote.modified / 1000:
-            print(self.filetype + ' ' + self.fullpath + ' timestamp differs, replacing existing ' + str(remote) + ' with ' + str(self))
+            print(self.filetype + ' ' + self.fullpath + ' timestamp differs, replacing existing ' + str(
+                remote) + ' with ' + str(self))
             return False
 
         if self.filesize is not None and self.filesize != remote.filesize:
-            print(self.filetype + ' ' + self.fullpath + ' filesize differs, replacing existing ' + str(remote) + ' with ' + str(self))
+            print(self.filetype + ' ' + self.fullpath + ' filesize differs, replacing existing ' + str(
+                remote) + ' with ' + str(self))
             return False
 
         changes = {}
@@ -207,7 +259,8 @@ class PhotoStationPhoto(object):
             changes['gps_lng'] = self.longitude
 
         if len(changes) > 0:
-            print(self.filetype + ' ' + self.fullpath +  ' has metadata changes ' + str(changes) + ', updating existing ' + str(remote))
+            print(self.filetype + ' ' + self.fullpath + ' has metadata changes ' + str(
+                changes) + ', updating existing ' + str(remote))
             self.update(changes)
 
         return True
@@ -221,15 +274,15 @@ class PhotoStationPhoto(object):
             'method': 'upload' + self.filetype,
             'version': '1',
             'dest_folder_path': self.album.path,
-            'duplicate': 'overwrite', # rename, ignore
+            'duplicate': 'overwrite',  # rename, ignore
             'filename': self.filename,
             'mtime': str(self.created),
             'title': self.title,
             'description': self.description,
             'ps_username': PhotoStationService.session.username,
             'original': (self.filename, data)
-            })
-        
+        })
+
         if self.rating > 0 or (self.latitude and self.longitude):
             self.update({
                 'rating': self.rating,
@@ -244,14 +297,14 @@ class PhotoStationPhoto(object):
             'id': PhotoStationUtils.photo_id(self.filetype, self.album.path, self.filename),
             'method': 'edit',
             'ps_username': PhotoStationService.session.username
-            }
+        }
         data.update(changes)
         PhotoStationService.session.query('SYNO.PhotoStation.Photo', data)
-        
+
     def delete(self):
         PhotoStationService.session.query('SYNO.PhotoStation.Photo', {
             'id': PhotoStationUtils.photo_id(self.filetype, self.album.path, self.filename),
             'method': 'delete',
             'ps_username': PhotoStationService.session.username
-            })
+        })
         self.album.remove_item(self.filename)
