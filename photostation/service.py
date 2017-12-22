@@ -259,6 +259,24 @@ class PhotoStationPhoto(object):
             ))
         return comments
 
+    def addComment(self, name, comment, email):
+        PhotoStationService.session.query("SYNO.PhotoStation.Comment", {
+            'method': 'create',
+            'version': 1,
+            'id': self.photoid,
+            'name': name,
+            'comment': comment,
+            'email': email
+        })
+
+    def deleteComment(self, commentId):
+        PhotoStationService.session.query("SYNO.PhotoStation.Comment", {
+            'method': 'delete',
+            'version': 1,
+            'id': self.photoid,
+            'comment_id': commentId,
+            'ps_username': PhotoStationService.session.username
+        })
 
     # Merge with remote if able.
     # Return false if rewrite is needed.

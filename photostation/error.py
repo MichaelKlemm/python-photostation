@@ -34,6 +34,7 @@ class SynologyException(Exception):
         467: 'No such tag',
         468: 'Duplicate tag',
         470: 'No such file',
+        492: 'need higher permission',
         555: 'No such shared album',
         599: 'No such task of the file operation',
         1001 : 'Http error: no response body, no response header',
@@ -44,9 +45,12 @@ class SynologyException(Exception):
         12038: 'Http error: serverCertificateHasUnknownRoot'
     }
 
-
     def __init__(self, code):
+        self.code = code
         if code in self.API_ERROR:
             self.value = self.API_ERROR[code]
         else:
             self.value = code
+
+    def __str__(self):
+        return str(self.code) + " " + str(self.value)
