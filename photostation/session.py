@@ -50,7 +50,7 @@ class SynologySession(object):
 
         try:
             rsp = response.json()
-            print(rsp)
+            # print(rsp)
         except:
             print('not json')
             return response.content

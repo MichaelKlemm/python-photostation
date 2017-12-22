@@ -121,16 +121,27 @@ class PhotoStationAlbum(object):
         return PhotoStationPhoto(self, filename, filetype, created, modified, filesize, title, description, rating,
                                  latitude, longitude)
 
+
 class PhotoStationThumbnail(object):
     def __init__(self, x, y, binary):
         self.x = x
         self.y = y
         self.binary = binary
 
+
+class PhotoStationComment(object):
+    def __init__(self, id, name, comment, date, email):
+        self.id = id
+        self.name = name
+        self.comment = comment
+        self.date = date
+        self.email = email
+
+
 class PhotoStationPhoto(object):
 
     def __init__(self, photoid, album, filename, filetype, created, modified, filesize, title, description, rating,
-                 latitude, longitude, thumbnail_sig, thumbnail_size):
+                 latitude, longitude, thumbnail_sig, thumbnail_sizes):
         self.album = album
         self.photoid = photoid
         self.filename = filename
@@ -144,8 +155,9 @@ class PhotoStationPhoto(object):
         self.latitude = latitude
         self.longitude = longitude
         self.thumbnail_sig = thumbnail_sig
-        self.thumbnail_size = thumbnail_size
-        self._thumbnails = None
+        self.thumbnail_sizes = thumbnail_sizes
+        self._thumbnails = {}
+        self._comments = None
 
     @classmethod
     def from_photostation(cls, album, psphoto):
@@ -187,7 +199,7 @@ class PhotoStationPhoto(object):
                    latitude=latitude,
                    longitude=longitude,
                    thumbnail_sig=thumbnail_sig,
-                   thumbnail_size=thumbnail_size)
+                   thumbnail_sizes=thumbnail_size)
 
     def __str__(self):
         return '{filename:' + self.filename.decode('utf-8').encode('unicode-escape') + \
@@ -206,24 +218,47 @@ class PhotoStationPhoto(object):
         return self.album.path + '/' + self.filename
 
     def thumbnails(self):
-        if not self._thumbnails and len(self.thumbnail_size) > 0:
-            thumbnails = {}
-            for size in self.thumbnail_size:
-                thumb = self.thumbnail_size.get(size)
-                x = thumb.get('resolutionx')
-                y = thumb.get('resolutiony')
-                mtime = thumb.get('mtime')
-                photo = PhotoStationService.session.query('SYNO.PhotoStation.Thumb', {
-                    'method': 'get',
-                    'version': 1,
-                    'size': size,
-                    'id': self.photoid,
-                    'thumb_sig': self.thumbnail_sig,
-                    'mtime': mtime}
-                )
-                thumbnails[size] = PhotoStationThumbnail(x, y, photo)
-            self._thumbnails = thumbnails
+        if len(self.thumbnail_sizes) != len(self._thumbnails):
+            for size in self.thumbnail_sizes:
+                self.thumbnail(size)
         return self._thumbnails
+
+    def thumbnail(self, size):
+        if not size in self._thumbnails.keys():
+            if not size in self.thumbnail_sizes.keys():
+                raise Exception("Not exist thumbnail size : " + size)
+            thumb = self.thumbnail_sizes.get(size)
+            x = thumb.get('resolutionx')
+            y = thumb.get('resolutiony')
+            mtime = thumb.get('mtime')
+            photo = PhotoStationService.session.query('SYNO.PhotoStation.Thumb', {
+                'method': 'get',
+                'version': 1,
+                'size': size,
+                'id': self.photoid,
+                'thumb_sig': self.thumbnail_sig,
+                'mtime': mtime}
+                                                      )
+            self._thumbnails[size] = PhotoStationThumbnail(x, y, photo)
+
+    def comments(self):
+        commentsJson = PhotoStationService.session.query("SYNO.PhotoStation.Comment", {
+            'method': 'list',
+            'version': 1,
+            'id': self.photoid
+        })
+        if commentsJson.get('success') is False:
+            raise Exception("get comment list fail")
+        comments = []
+        for comment in commentsJson.get('comments'):
+            comments.append(PhotoStationComment(id=comment.get('id'),
+                                                name=comment.get('name'),
+                                                comment=comment.get('comment'),
+                                                date=comment.get('date'),
+                                                email=comment.get('email')
+            ))
+        return comments
+
 
     # Merge with remote if able.
     # Return false if rewrite is needed.
