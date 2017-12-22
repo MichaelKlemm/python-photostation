@@ -10,6 +10,11 @@ except ImportError:
 from pprint import pprint, pformat
 from photostation.error import SynologyException
 
+def slient(string):
+    pass
+print = slient
+pprint = slient
+
 class SynologySession(object):
 
     def __init__(self, url):

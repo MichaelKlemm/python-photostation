@@ -240,6 +240,7 @@ class PhotoStationPhoto(object):
                 'mtime': mtime}
                                                       )
             self._thumbnails[size] = PhotoStationThumbnail(x, y, photo)
+            return self._thumbnails[size]
 
     def comments(self):
         commentsJson = PhotoStationService.session.query("SYNO.PhotoStation.Comment", {
