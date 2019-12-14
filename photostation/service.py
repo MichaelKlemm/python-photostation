@@ -11,8 +11,8 @@ from pprint import pprint, pformat
 class PhotoStationService(object):
     session = None
 
-    def __init__(self, url, root_album):
-        PhotoStationService.session = SynologyAuthSession(url)
+    def __init__(self, url, root_album, verify: bool = True):
+        PhotoStationService.session = SynologyAuthSession(url, verify)
 
         self.root_album = PhotoStationAlbum(None, root_album)
 

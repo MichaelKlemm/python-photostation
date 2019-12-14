@@ -17,9 +17,11 @@ pprint = slient
 
 class SynologySession(object):
 
-    def __init__(self, url):
+    def __init__(self, url, verify: bool = True):
         self.url = url
         self.session = requests.Session()
+        if not verify:
+            self.session.verify = False
 
         self.headers = {}
         self.info = {
@@ -71,14 +73,14 @@ class SynologySession(object):
 
 class SynologyAuthSession(SynologySession):
 
-    def __init__(self, url):
+    def __init__(self, url, verify: bool = True):
         components = urlparse(url)
         self.username = components.username
 
         # sanitized url
         url = url.replace(self.username + ':' + components.password + '@', '')
 
-        super(SynologyAuthSession, self).__init__(url)
+        super(SynologyAuthSession, self).__init__(url, verify)
 
         self.authenticate(self.username, components.password)
 
