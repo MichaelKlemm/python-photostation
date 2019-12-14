@@ -36,5 +36,7 @@ setup(
     ],
     keywords='synology dsm photo station web api',
     packages=['photostation'],
-    install_requires=['requests>=1.2'],
+    install_requires=[
+        'requests>=1.2',
+        'requests-toolbelt==0.9.1'],
 )
